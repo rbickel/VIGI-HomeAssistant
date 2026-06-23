@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import device_registry as dr
 
 from .api import VigiNvrClient
 from .const import (
@@ -27,6 +28,7 @@ LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: tuple[Platform, ...] = (
     Platform.BINARY_SENSOR,
+    Platform.CAMERA,
     Platform.SENSOR,
     Platform.SWITCH,
 )
@@ -44,6 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     coordinator = VigiNvrCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
+    _register_nvr_device(hass, entry)
 
     webhook_id = _get_or_create_webhook_id(hass, entry)
     webhook_url = _generate_webhook_url(hass, webhook_id)
@@ -99,6 +102,18 @@ def _get_or_create_webhook_id(hass: HomeAssistant, entry: ConfigEntry) -> str:
         data={**entry.data, CONF_EVENT_WEBHOOK_ID: webhook_id},
     )
     return webhook_id
+
+
+def _register_nvr_device(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Ensure the parent NVR device exists before channel devices reference it."""
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        manufacturer="TP-Link",
+        model="VIGI NVR",
+        name=entry.title or "VIGI NVR",
+    )
 
 
 def _generate_webhook_url(hass: HomeAssistant, webhook_id: str) -> str:

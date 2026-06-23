@@ -76,13 +76,39 @@ EVENT_SUBTYPE_LABELS = {
 
 
 @dataclasses.dataclass(slots=True)
+class VigiEventImage:
+    """Image part attached to a VIGI event push."""
+
+    part_index: int
+    part_name: str | None
+    filename: str | None
+    content_type: str
+    data: bytes
+
+    @property
+    def bytes(self) -> int:
+        """Return the image byte length."""
+        return len(self.data)
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return serializable image metadata without the raw bytes."""
+        return {
+            "part_index": self.part_index,
+            "part_name": self.part_name,
+            "filename": self.filename,
+            "content_type": self.content_type,
+            "bytes": self.bytes,
+        }
+
+
+@dataclasses.dataclass(slots=True)
 class VigiEventPush:
     """Parsed VIGI event push."""
 
     mode: str
     event: dict[str, Any] | None
     events: list[dict[str, Any]]
-    images: list[dict[str, Any]]
+    images: list[VigiEventImage]
     raw_bytes: int
     content_type: str
 
@@ -116,7 +142,7 @@ class VigiEventPush:
             "mode": self.mode,
             "event": self.event,
             "events": self.events,
-            "images": self.images,
+            "images": [image.as_dict() for image in self.images],
             "raw_bytes": self.raw_bytes,
             "content_type": self.content_type,
             "message_count": self.message_count,
@@ -163,7 +189,7 @@ def parse_vigi_event_push(content_type: str, body: bytes) -> VigiEventPush:
 def parse_multipart_event_push(
     content_type: str,
     body: bytes,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[VigiEventImage]]:
     """Parse VIGI multipart event push payloads."""
     header_blob = (
         f"Content-Type: {content_type}\r\n"
@@ -174,7 +200,7 @@ def parse_multipart_event_push(
     )
 
     events: list[dict[str, Any]] = []
-    images: list[dict[str, Any]] = []
+    images: list[VigiEventImage] = []
     if not message.is_multipart():
         return events, images
 
@@ -194,13 +220,13 @@ def parse_multipart_event_push(
 
         if media_type.startswith("image/"):
             images.append(
-                {
-                    "part_index": index,
-                    "part_name": part_name,
-                    "filename": filename,
-                    "content_type": media_type,
-                    "bytes": len(part_body),
-                }
+                VigiEventImage(
+                    part_index=index,
+                    part_name=part_name,
+                    filename=filename,
+                    content_type=media_type,
+                    data=part_body,
+                )
             )
 
     return events, images

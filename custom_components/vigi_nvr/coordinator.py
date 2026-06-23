@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import VigiApiError, VigiNvrClient
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN, STREAM_MAIN, STREAM_MINOR
-from .events import VigiEventPush
+from .events import VigiEventImage, VigiEventPush
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.event_webhook_id: str | None = None
         self.event_webhook_url: str | None = None
         self.last_event_push: VigiEventPush | None = None
+        self.last_event_image: VigiEventImage | None = None
         self.last_event_received_at: dt.datetime | None = None
         self.last_event_client_ip: str | None = None
 
@@ -72,6 +73,7 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         """Store the latest VIGI event push and notify entities."""
         received_at = dt.datetime.now(dt.UTC)
         self.last_event_push = event_push
+        self.last_event_image = event_push.images[0] if event_push.images else None
         self.last_event_received_at = received_at
         self.last_event_client_ip = client_ip
         self.async_set_updated_data(self.data)
