@@ -38,6 +38,7 @@ async def async_setup_entry(
         entities.append(VigiPoePortLinkedBinarySensor(coordinator, entry.entry_id, port))
 
     entities.append(VigiAlarmEventServerConfiguredBinarySensor(coordinator, entry.entry_id))
+    entities.append(VigiLastEventAlarmRelatedBinarySensor(coordinator, entry.entry_id))
     async_add_entities(entities)
 
 
@@ -113,7 +114,42 @@ class VigiAlarmEventServerConfiguredBinarySensor(VigiNvrEntity, BinarySensorEnti
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {"event_servers": self.coordinator.data.event_servers}
+        return {
+            "event_servers": self.coordinator.data.event_servers,
+            "webhook_url": self.coordinator.event_webhook_url,
+            "webhook_id": self.coordinator.event_webhook_id,
+        }
+
+
+class VigiLastEventAlarmRelatedBinarySensor(VigiNvrEntity, BinarySensorEntity):
+    """Whether the latest pushed event is alarm-related."""
+
+    entity_description = BinarySensorEntityDescription(
+        key="last_event_alarm_related",
+        name="Last event alarm related",
+    )
+
+    def __init__(self, coordinator: VigiNvrCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "last_event_alarm_related")
+
+    @property
+    def is_on(self) -> bool | None:
+        event_push = self.coordinator.last_event_push
+        return event_push.alarm_related if event_push is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        event_push = self.coordinator.last_event_push
+        last_message = event_push.last_message if event_push is not None else None
+        return {
+            "received_at": (
+                self.coordinator.last_event_received_at.isoformat()
+                if self.coordinator.last_event_received_at
+                else None
+            ),
+            "source_ip": self.coordinator.last_event_client_ip,
+            "last_message": last_message,
+        }
 
 
 def poe_ports(data: Any) -> set[int]:

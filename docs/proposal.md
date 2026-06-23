@@ -15,7 +15,7 @@ The alarm-related pieces it does document are observational/event-oriented:
 - Event subtype `Alarm signal` under channel events.
 - Device exception subtype `Alarm input`.
 
-Because there is no documented arm/disarm command, this implementation intentionally does not register `alarm_control_panel`. Adding one now would create controls that do not map to verified NVR behavior. The right next step is an event receiver service/entity layer, or a second endpoint discovery pass against any newer/private VIGI alarm API document if one exists.
+Because there is no documented arm/disarm command, this implementation intentionally does not register `alarm_control_panel`. Adding one now would create controls that do not map to verified NVR behavior. The event receiver is implemented so alarm-related pushes can be observed, while a second endpoint discovery pass can still look for newer/private VIGI alarm command APIs.
 
 ## Implemented Scope
 
@@ -46,12 +46,18 @@ Sensors:
 - PoE total power and used power.
 - Disk status, free space, and total space.
 - Channel IP, MAC, audio volumes, stream resolutions, stream bitrates, and RTSP URLs.
+- Event webhook URL, latest pushed event summary, and latest event received timestamp.
 
 Binary sensors:
 
 - Channel online state.
 - PoE port linked state.
 - Event server configured state.
+- Latest pushed event alarm-related state.
+
+Events:
+
+- Incoming Home Assistant webhook pushes fire `vigi_nvr_event` on the event bus with parsed JSON/multipart event data, labels, source IP, and config entry ID.
 
 Switches:
 
@@ -65,8 +71,8 @@ Switches:
 1. Run `scripts/discover_vigi_openapi.py` with credentials to probe the documented read-only endpoints on the actual NVR and save `docs/discovery/endpoint-probes.md`.
 2. Install the custom component into a Home Assistant dev instance and add the integration through the config flow.
 3. Verify which optional endpoints this NVR model supports. The coordinator already tolerates unsupported endpoints.
-4. Add an event receiver endpoint inside Home Assistant or a small companion webhook service, then register it with `POST /openapi/event_server/new_server`.
-5. Convert received VIGI event messages into Home Assistant event entities/binary sensors for motion, human/vehicle, alarm signal, alarm input, video loss, and disk/device exceptions.
+4. Configure the NVR event server to point at the Home Assistant `Event webhook URL` sensor attributes, then trigger motion/alarm/device events.
+5. Convert repeated VIGI event messages into richer Home Assistant event entities/binary sensors for motion, human/vehicle, alarm signal, alarm input, video loss, and disk/device exceptions.
 6. If a separate VIGI alarm-control endpoint is found, add `alarm_control_panel` only after confirming read state plus reversible commands.
 
 ## Fleet Split

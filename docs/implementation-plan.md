@@ -10,6 +10,7 @@
 6. Removed the placeholder `alarm_control_panel` because no documented alarm arm/disarm endpoint exists.
 7. Updated discovery tooling to probe documented read-only endpoints and record mutating endpoints without calling them.
 8. Added a standalone HTTP event capture server for VIGI push messages.
+9. Added a Home Assistant webhook receiver for VIGI `event_message` pushes, plus last-event sensors and `vigi_nvr_event` bus events.
 
 ## Next Validation Steps
 
@@ -25,8 +26,8 @@
 2. Review `docs/discovery/endpoint-probes.md` to see which endpoints are supported by the device and firmware.
 3. Install the custom component in a Home Assistant development instance.
 4. Add the integration through the UI and verify the created entities.
-5. Run `scripts/capture_vigi_events.py`, configure the NVR event server to point at it, and collect sample motion/alarm/device events.
-6. Decide whether to build the event receiver as part of the integration or as a companion webhook service.
+5. Configure the NVR event server to point at the Home Assistant `Event webhook URL` sensor attributes and collect sample motion/alarm/device events.
+6. Use `scripts/capture_vigi_events.py` only when raw payload files or image-part captures are needed outside Home Assistant.
 
 ## Fleet Dispatch Candidates
 
@@ -36,7 +37,7 @@ Run the endpoint probe, inspect response schemas, and update the catalog with mo
 
 ### Event Receiver Agent
 
-Implement an HTTP/HTTPS endpoint that accepts VIGI multipart event pushes, parses JSON plus optional JPEG parts, and maps event type/subtype IDs to Home Assistant events and binary sensors.
+Expand the implemented webhook receiver into richer event entities and per-channel binary sensors for motion, human/vehicle, alarm signal, alarm input, video loss, and disk/device exceptions.
 
 ### Home Assistant Quality Agent
 

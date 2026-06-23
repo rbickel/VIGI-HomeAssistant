@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import urllib.parse
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfPower
 from homeassistant.core import HomeAssistant
@@ -37,6 +42,9 @@ async def async_setup_entry(
         VigiNvrNtpServerSensor(coordinator, entry.entry_id),
         VigiNvrPoeTotalPowerSensor(coordinator, entry.entry_id),
         VigiNvrPoeCostPowerSensor(coordinator, entry.entry_id),
+        VigiEventWebhookUrlSensor(coordinator, entry.entry_id),
+        VigiLastEventSensor(coordinator, entry.entry_id),
+        VigiLastEventReceivedSensor(coordinator, entry.entry_id),
     ]
 
     for disk in coordinator.data.disks:
@@ -245,6 +253,97 @@ class VigiNvrPoeCostPowerSensor(VigiNvrEntity, SensorEntity):
         global_status = poe_global_status(self.coordinator.data.poe_status)
         value = global_status.get("cost_power")
         return value / 10 if isinstance(value, int) else None
+
+
+class VigiEventWebhookUrlSensor(VigiNvrEntity, SensorEntity):
+    """Home Assistant webhook URL for VIGI event pushes."""
+
+    entity_description = SensorEntityDescription(
+        key="event_webhook_url",
+        name="Event webhook URL",
+    )
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: VigiNvrCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "event_webhook_url")
+
+    @property
+    def native_value(self) -> str | None:
+        return self.coordinator.event_webhook_url
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        url = self.coordinator.event_webhook_url
+        parsed = urllib.parse.urlparse(url or "")
+        return {
+            "webhook_id": self.coordinator.event_webhook_id,
+            "event_server_protocol": parsed.scheme.upper() if parsed.scheme else None,
+            "event_server_host": parsed.hostname,
+            "event_server_port": parsed.port,
+            "event_server_url": parsed.path or url,
+        }
+
+
+class VigiLastEventSensor(VigiNvrEntity, SensorEntity):
+    """Latest pushed VIGI event summary."""
+
+    entity_description = SensorEntityDescription(
+        key="last_event",
+        name="Last event",
+    )
+
+    def __init__(self, coordinator: VigiNvrCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "last_event")
+
+    @property
+    def native_value(self) -> str | None:
+        event_push = self.coordinator.last_event_push
+        if event_push is None:
+            return None
+        message = event_push.last_message
+        if message is None:
+            return event_push.mode
+        labels = message.get("sub_type_labels")
+        if isinstance(labels, list) and labels:
+            return ", ".join(str(label) for label in labels)
+        value = message.get("type_label") or message.get("type")
+        return str(value) if value is not None else event_push.mode
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        event_push = self.coordinator.last_event_push
+        if event_push is None:
+            return {
+                "webhook_url": self.coordinator.event_webhook_url,
+                "received_at": None,
+            }
+        return {
+            **event_push.as_dict(),
+            "received_at": (
+                self.coordinator.last_event_received_at.isoformat()
+                if self.coordinator.last_event_received_at
+                else None
+            ),
+            "source_ip": self.coordinator.last_event_client_ip,
+            "webhook_url": self.coordinator.event_webhook_url,
+        }
+
+
+class VigiLastEventReceivedSensor(VigiNvrEntity, SensorEntity):
+    """Timestamp for the latest VIGI event push."""
+
+    entity_description = SensorEntityDescription(
+        key="last_event_received",
+        name="Last event received",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    )
+
+    def __init__(self, coordinator: VigiNvrCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "last_event_received")
+
+    @property
+    def native_value(self) -> Any:
+        return self.coordinator.last_event_received_at
 
 
 class VigiDiskSensor(VigiNvrEntity, SensorEntity):

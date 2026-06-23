@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
+REDACTED_CONFIG_KEYS = {"password", "event_webhook_id"}
+
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
@@ -22,7 +24,7 @@ async def async_get_config_entry_diagnostics(
             "data": {
                 key: value
                 for key, value in entry.data.items()
-                if key not in {"password"}
+                if key not in REDACTED_CONFIG_KEYS
             },
         },
     }

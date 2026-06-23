@@ -8,6 +8,9 @@ DEFAULT_VERIFY_TLS = False
 DEFAULT_SCAN_INTERVAL_SECONDS = 60
 
 CONF_VERIFY_TLS = "verify_tls"
+CONF_EVENT_WEBHOOK_ID = "event_webhook_id"
+
+EVENT_VIGI_NVR_EVENT = "vigi_nvr_event"
 
 ATTR_CHANNEL = "channel"
 ATTR_STREAM = "stream"

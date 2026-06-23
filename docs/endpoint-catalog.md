@@ -43,6 +43,7 @@ Source: VIGI NVR Open API Document PDF provided in the workspace conversation.
 | Event | GET | `/openapi/event_server` | Get configured event push servers | Yes | Yes |
 | Event | POST | `/openapi/event_server/new_server` | Add event push server | Yes | Planned service/options |
 | Event | POST | `/openapi/event_server/delete_server` | Delete event push server | Yes | Planned service/options |
+| Event push | POST | `/api/webhook/<id>` | Home Assistant receiver for VIGI `event_message` pushes | N/A | Yes |
 | Recording | GET | `/openapi/record/days` | Get days with recordings | Yes | No |
 | Recording | GET | `/openapi/record/search/free_process` | Get free search process ID | Yes | No |
 | Recording | GET | `/openapi/record/search/results` | Get recording result ranges | Yes | No |

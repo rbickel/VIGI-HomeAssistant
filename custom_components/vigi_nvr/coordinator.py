@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import logging
 from datetime import timedelta
 from typing import Any
@@ -12,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import VigiApiError, VigiNvrClient
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN, STREAM_MAIN, STREAM_MINOR
+from .events import VigiEventPush
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +53,29 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL_SECONDS),
         )
         self.client = client
+        self.event_webhook_id: str | None = None
+        self.event_webhook_url: str | None = None
+        self.last_event_push: VigiEventPush | None = None
+        self.last_event_received_at: dt.datetime | None = None
+        self.last_event_client_ip: str | None = None
+
+    def set_event_webhook(self, webhook_id: str, webhook_url: str) -> None:
+        """Store the Home Assistant webhook information for entities."""
+        self.event_webhook_id = webhook_id
+        self.event_webhook_url = webhook_url
+
+    def store_event_push(
+        self,
+        event_push: VigiEventPush,
+        client_ip: str | None,
+    ) -> dt.datetime:
+        """Store the latest VIGI event push and notify entities."""
+        received_at = dt.datetime.now(dt.UTC)
+        self.last_event_push = event_push
+        self.last_event_received_at = received_at
+        self.last_event_client_ip = client_ip
+        self.async_set_updated_data(self.data)
+        return received_at
 
     async def _async_update_data(self) -> VigiNvrData:
         """Fetch state data from the NVR."""

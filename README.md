@@ -1,63 +1,157 @@
-# VIGI NVR Home Assistant Integration
+# TP-Link VIGI NVR for Home Assistant
 
-Custom Home Assistant integration project for TP-Link VIGI NVR devices with OpenAPI enabled.
+Custom Home Assistant integration for TP-Link VIGI NVR systems with OpenAPI enabled. It exposes NVR health, camera channel metadata, disk and PoE state, audio controls, RTSP URL helpers, and VIGI push events inside Home Assistant.
 
-The immediate goal is to integrate the documented VIGI NVR OpenAPI surface into Home Assistant and identify whether alarm control is actually exposed by the NVR firmware.
+This integration is currently early-stage and focused on local NVR control/monitoring through the documented VIGI OpenAPI.
 
-## Current Findings
+## Features
 
-- The NVR is reachable at `https://192.168.50.206:20443`.
-- Generic web, CGI, ISAPI, Swagger, and ONVIF-style discovery paths returned `404` on the OpenAPI port.
-- `/openapi`, `/openapi.json`, `/openapi.yaml`, `/openapi/server`, `/openapi/server/api/v1`, and `/openapi/server/api/v1/swagger.json` returned `401` before auth and `404` after auth, so the NVR does not appear to host an OpenAPI JSON/YAML document at those paths.
-- The auth challenge is `Digest realm="TP-LINK NVR"` with `algorithm="SHA-256"` and `url="/openapi/token"`.
-- TP-Link FAQ 4797 documents a two-step flow: SHA-256 Digest authentication to `/openapi/token`, then `Authorization: Bearer <decoded access_token>` for API calls.
-- The provided VIGI NVR Open API PDF documents fixed REST endpoints under `/openapi/...` rather than a downloadable spec endpoint.
-- The PDF documents event push and alarm-related event payload fields, but it does not document arm, disarm, activate, or deactivate alarm control endpoints.
+- Local polling through the VIGI NVR OpenAPI.
+- Config flow setup from the Home Assistant UI.
+- Channel, disk, PoE, timing, NTP, audio, and RTSP diagnostic entities.
+- Switches for supported audio mute/noise cancelling and PoE port enable controls.
+- Home Assistant webhook receiver for VIGI event pushes.
+- Parsed `vigi_nvr_event` events on the Home Assistant event bus.
+- Alarm-related push detection for documented VIGI alarm signal/input events.
 
-## Discovery
+## Requirements
 
-The discovery script reads credentials from environment variables and does not persist credentials or tokens.
+- Home Assistant with custom integrations enabled.
+- A TP-Link VIGI NVR with OpenAPI enabled.
+- NVR host/IP, OpenAPI port, username, and password.
+- Network connectivity from Home Assistant to the NVR.
+- Network connectivity from the NVR back to Home Assistant if you want push events.
 
-```powershell
-$env:VIGI_HOST = "192.168.50.206"
-$env:VIGI_PORT = "20443"
-$env:VIGI_USERNAME = "admin"
-$env:VIGI_PASSWORD = "<your-password>"
-python scripts/discover_vigi_openapi.py
+The default OpenAPI port used by the integration is `20443`.
+
+## Installation With HACS
+
+This repository can be installed as a HACS custom repository.
+
+1. Open Home Assistant.
+2. Go to HACS.
+3. Open the three-dot menu and choose `Custom repositories`.
+4. Add `https://github.com/rbickel/VIGI-HomeAssistant` as the repository URL.
+
+5. Select the category `Integration`.
+6. Install `TP-Link VIGI NVR`.
+7. Restart Home Assistant.
+
+## Manual Installation
+
+Copy [custom_components/vigi_nvr](custom_components/vigi_nvr) into your Home Assistant `custom_components` directory so the final path is:
+
+```text
+config/custom_components/vigi_nvr
 ```
 
-Outputs are written to `docs/discovery/`:
+Restart Home Assistant after copying the files.
 
-- `endpoint-probes.json`: authenticated read-only endpoint probe summaries.
-- `endpoint-probes.md`: human-readable read-only endpoint status plus mutating endpoints intentionally not called.
-- `summary.json` and `endpoints.md`: optional legacy outputs if `--spec-path` is used.
+## Add The Integration
 
-## Event Push Capture
+1. In Home Assistant, go to `Settings` > `Devices & services`.
+2. Choose `Add integration`.
+3. Search for `TP-Link VIGI NVR`.
+4. Enter the NVR connection details:
+   - Host/IP address.
+   - Username.
+   - Password.
+   - OpenAPI port, usually `20443`.
+   - TLS verification setting.
+5. Submit the form.
 
-The VIGI OpenAPI event protocol pushes to an HTTP or HTTPS event server. A standalone HTTP capture script is included so we can learn the exact payloads from your NVR before turning them into Home Assistant event entities.
+The integration authenticates locally using the VIGI OpenAPI token flow and stores the config entry in Home Assistant.
 
-```powershell
-python scripts/capture_vigi_events.py --port 3001 --path /event_message
+## VIGI Push Events
+
+The integration registers a Home Assistant webhook for VIGI event pushes. After setup, find the `Event webhook URL` diagnostic sensor and use its attributes to configure the NVR event server.
+
+Use these sensor attributes in the VIGI NVR event server configuration:
+
+| Sensor attribute | NVR field |
+| --- | --- |
+| `event_server_protocol` | Protocol, usually `HTTP` |
+| `event_server_host` | Server IP/domain |
+| `event_server_port` | Server port |
+| `event_server_url` | URL/path |
+
+Incoming VIGI pushes update:
+
+- `Last event`
+- `Last event received`
+- `Last event alarm related`
+
+Each accepted push also fires a Home Assistant event named `vigi_nvr_event`. You can use this event in automations to react to VIGI motion, alarm signal, alarm input, video loss, disk, storage, or device exception events.
+
+Example automation trigger:
+
+```yaml
+trigger:
+  - platform: event
+    event_type: vigi_nvr_event
+condition:
+  - condition: template
+    value_template: "{{ trigger.event.data.alarm_related }}"
+action:
+  - service: notify.notify
+    data:
+      message: "VIGI alarm event received"
 ```
 
-The script prints a suggested NVR event server value such as `HTTP <local-ip>:3001/event_message`. Configure that in the NVR event server settings with `picture_switch` on or off depending on whether you want image parts captured.
+## Entities
 
-Captured requests are written under `docs/discovery/event-captures/` and include request headers, the raw body, parsed event JSON when available, optional image parts, and a `summary.json` with event type/subtype labels.
+Sensors include:
 
-## Home Assistant Shape
+- Channel count, disk count, and event server count.
+- Timing mode and NTP server.
+- PoE total power and used power.
+- Disk status, free space, and total space.
+- Channel IP address, MAC address, audio volume, stream resolution, stream bitrate, and RTSP URLs.
+- Event webhook URL, latest event, and latest event received timestamp.
 
-The custom component lives in `custom_components/vigi_nvr/`. It includes a config flow, VIGI API client, coordinator, sensors, binary sensors, and switches.
+Binary sensors include:
 
-Implemented platforms:
+- Channel online state.
+- PoE port linked state.
+- Event server configured state.
+- Latest event alarm-related state.
 
-- `sensor`: channel count, disk count/status, timing/NTP, PoE power, channel metadata, stream metadata, audio volume, and RTSP URL helpers.
-- `binary_sensor`: channel online state, PoE port linked state, and event server configured state.
-- `switch`: audio input/output mute, audio input noise cancelling, and PoE port enable.
+Switches include:
 
-Not implemented yet:
+- Channel audio output mute.
+- Channel audio input mute.
+- Channel audio input noise cancelling.
+- PoE port enable.
 
-- `alarm_control_panel`: blocked until a real arm/disarm endpoint is found and validated.
-- `camera`: later phase; RTSP URLs are exposed as diagnostic sensors first.
-- Event receiver entities: planned next step for VIGI event push messages.
+## Alarm Control Status
 
-See [docs/proposal.md](docs/proposal.md) for the implementation plan.
+The VIGI OpenAPI documentation used for this integration includes alarm-related event payloads, but it does not document direct alarm arm, disarm, activate, or deactivate commands.
+
+For that reason, this integration does not currently provide an `alarm_control_panel` entity. Alarm-related pushes are exposed through the webhook entities and `vigi_nvr_event` event bus data instead.
+
+## Troubleshooting
+
+If setup fails:
+
+- Confirm OpenAPI is enabled on the VIGI NVR.
+- Confirm the host/IP and port are reachable from Home Assistant.
+- Confirm the username and password can authenticate to the NVR.
+- Try disabling TLS verification if the NVR uses a self-signed certificate.
+
+If push events do not arrive:
+
+- Confirm the NVR can reach the Home Assistant host and port shown by the `Event webhook URL` sensor attributes.
+- Confirm the NVR event server path matches `event_server_url` exactly.
+- Use `HTTP` first unless you have verified HTTPS routing and certificates from the NVR to Home Assistant.
+- Check Home Assistant logs for `vigi_nvr` messages.
+
+## Current Limitations
+
+- Camera entities are not implemented yet; RTSP URLs are exposed as diagnostic sensors.
+- Event server registration is manual in the NVR UI for now.
+- Alarm arm/disarm controls are not implemented because no documented endpoint has been validated.
+- Some endpoints may vary by NVR model or firmware. Unsupported optional endpoints are skipped by the coordinator.
+
+## Development Notes
+
+Developer notes, endpoint cataloging, implementation planning, and validation details live under [docs](docs). The main integration code is in [custom_components/vigi_nvr](custom_components/vigi_nvr).
