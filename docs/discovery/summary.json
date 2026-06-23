@@ -1,0 +1,63 @@
+{
+  "alarm_candidate_count": 0,
+  "alarm_candidates": [],
+  "endpoint_count": 0,
+  "probes": [
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi.json",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi.yaml",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi/server",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi/server/api/v1",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi/server/api/v1/swagger.json",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi/server/api/v1/openapi.json",
+      "status": 404
+    },
+    {
+      "bytes": 26,
+      "content_type": "text/plain",
+      "method": "GET",
+      "path": "/openapi/server/api/v1/openapi.yaml",
+      "status": 404
+    }
+  ]
+}
