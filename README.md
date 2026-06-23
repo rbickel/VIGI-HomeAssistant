@@ -28,13 +28,15 @@ The default OpenAPI port used by the integration is `20443`.
 
 This repository can be installed as a HACS custom repository.
 
+HACS requires a valid GitHub release version for integrations. Use the latest published release, such as `v0.1.0`, instead of a branch commit hash.
+
 1. Open Home Assistant.
 2. Go to HACS.
 3. Open the three-dot menu and choose `Custom repositories`.
 4. Add `https://github.com/rbickel/VIGI-HomeAssistant` as the repository URL.
 
 5. Select the category `Integration`.
-6. Install `TP-Link VIGI NVR`.
+6. Install `TP-Link VIGI NVR` from the latest release.
 7. Restart Home Assistant.
 
 ## Manual Installation
