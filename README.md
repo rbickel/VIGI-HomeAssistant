@@ -12,7 +12,7 @@ This integration is currently early-stage and focused on local NVR control/monit
 - Switches for supported audio mute/noise cancelling and PoE port enable controls.
 - Home Assistant webhook receiver for VIGI event pushes.
 - Parsed `vigi_nvr_event` events on the Home Assistant event bus.
-- Latest event image camera for picture attachments sent with VIGI push events.
+- Per-channel latest event image cameras for picture attachments sent with VIGI push events.
 - Alarm-related push detection for documented VIGI alarm signal/input events.
 
 ## Requirements
@@ -88,16 +88,17 @@ For example, if Home Assistant is reachable from the NVR at `http://192.168.50.1
 | IP/domain | `192.168.50.10` |
 | Port | `8123` |
 | URL/path | `/api/webhook/abc123` |
-| Picture switch | `off` to start, `on` to update the latest event image camera |
+| Picture switch | `off` to start, `on` to update per-channel latest event image cameras |
 
 Incoming VIGI pushes update:
 
 - `Last event`
 - `Last event received`
 - `Last event alarm related`
-- `Last event image`, when the VIGI event includes a picture attachment
+- Channel `Last event image` cameras, when the VIGI event includes a picture attachment and source channel
+- `Unassigned event image`, when a picture attachment cannot be mapped to a known channel
 
-Picture attachments are exposed as a Home Assistant camera entity instead of base64 state attributes. Home Assistant records entity state and attributes in its database, so storing image bytes or base64 there would create noisy, oversized history. The integration keeps only the latest event image in memory and exposes lightweight image metadata in attributes.
+Picture attachments are exposed as Home Assistant camera entities instead of base64 state attributes. Home Assistant records entity state and attributes in its database, so storing image bytes or base64 there would create noisy, oversized history. The integration keeps only the latest event image for each channel in memory and exposes lightweight image metadata in attributes.
 
 Each accepted push also fires a Home Assistant event named `vigi_nvr_event`. You can use this event in automations to react to VIGI motion, alarm signal, alarm input, video loss, disk, storage, or device exception events.
 
@@ -143,7 +144,8 @@ Switches include:
 
 Cameras include:
 
-- Latest VIGI event image from push event picture attachments.
+- Latest VIGI event image for each camera channel.
+- Unassigned event image fallback for picture attachments without a known channel.
 
 ## Alarm Control Status
 
@@ -170,7 +172,7 @@ If push events do not arrive:
 ## Current Limitations
 
 - Live camera entities are not implemented yet; RTSP URLs are exposed as diagnostic sensors.
-- Latest event images are kept in memory only and are replaced by the next pushed event.
+- Latest event images are kept in memory only and are replaced by the next pushed image for the same channel.
 - Event server registration is manual in the NVR UI for now.
 - Alarm arm/disarm controls are not implemented because no documented endpoint has been validated.
 - Some endpoints may vary by NVR model or firmware. Unsupported optional endpoints are skipped by the coordinator.

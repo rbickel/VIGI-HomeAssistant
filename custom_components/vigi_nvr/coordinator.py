@@ -57,6 +57,14 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.event_webhook_url: str | None = None
         self.last_event_push: VigiEventPush | None = None
         self.last_event_image: VigiEventImage | None = None
+        self.last_event_images_by_channel: dict[int, VigiEventImage] = {}
+        self.last_event_pushes_by_channel: dict[int, VigiEventPush] = {}
+        self.last_event_received_at_by_channel: dict[int, dt.datetime] = {}
+        self.last_event_client_ip_by_channel: dict[int, str | None] = {}
+        self.last_unassigned_event_image: VigiEventImage | None = None
+        self.last_unassigned_event_push: VigiEventPush | None = None
+        self.last_unassigned_event_received_at: dt.datetime | None = None
+        self.last_unassigned_event_client_ip: str | None = None
         self.last_event_received_at: dt.datetime | None = None
         self.last_event_client_ip: str | None = None
 
@@ -76,8 +84,35 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.last_event_image = event_push.images[0] if event_push.images else None
         self.last_event_received_at = received_at
         self.last_event_client_ip = client_ip
+        if event_push.images:
+            self._store_event_image(event_push, received_at, client_ip)
         self.async_set_updated_data(self.data)
         return received_at
+
+    def _store_event_image(
+        self,
+        event_push: VigiEventPush,
+        received_at: dt.datetime,
+        client_ip: str | None,
+    ) -> None:
+        """Store the latest event image for its source channel when known."""
+        image = event_push.images[0]
+        source_channel = event_push.source_channel
+        if source_channel is not None and self.has_channel(source_channel):
+            self.last_event_images_by_channel[source_channel] = image
+            self.last_event_pushes_by_channel[source_channel] = event_push
+            self.last_event_received_at_by_channel[source_channel] = received_at
+            self.last_event_client_ip_by_channel[source_channel] = client_ip
+            return
+
+        self.last_unassigned_event_image = image
+        self.last_unassigned_event_push = event_push
+        self.last_unassigned_event_received_at = received_at
+        self.last_unassigned_event_client_ip = client_ip
+
+    def has_channel(self, channel: int) -> bool:
+        """Return whether the latest coordinator data contains a channel."""
+        return any(as_int(device.get("id")) == channel for device in self.data.devices)
 
     async def _async_update_data(self) -> VigiNvrData:
         """Fetch state data from the NVR."""

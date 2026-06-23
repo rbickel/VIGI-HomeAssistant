@@ -74,6 +74,8 @@ EVENT_SUBTYPE_LABELS = {
     },
 }
 
+CHANNEL_KEYS = ("channel", "channel_id", "channelId")
+
 
 @dataclasses.dataclass(slots=True)
 class VigiEventImage:
@@ -136,6 +138,29 @@ class VigiEventPush:
                 return message if isinstance(message, dict) else None
         return None
 
+    @property
+    def source_channel(self) -> int | None:
+        """Return the best channel associated with this event push."""
+        message = self.last_message
+        if message is not None:
+            channel = channel_from_mapping(message)
+            if channel is not None:
+                return channel
+
+        for event in reversed(self.events):
+            channel = channel_from_mapping(event)
+            if channel is not None:
+                return channel
+            messages = event.get("messages", [])
+            if isinstance(messages, list):
+                for event_message in reversed(messages):
+                    if not isinstance(event_message, dict):
+                        continue
+                    channel = channel_from_mapping(event_message)
+                    if channel is not None:
+                        return channel
+        return None
+
     def as_dict(self) -> dict[str, Any]:
         """Return a serializable event push dictionary."""
         return {
@@ -148,6 +173,7 @@ class VigiEventPush:
             "message_count": self.message_count,
             "alarm_related": self.alarm_related,
             "last_message": self.last_message,
+            "source_channel": self.source_channel,
         }
 
 
@@ -282,6 +308,15 @@ def is_alarm_related(event_type: int, sub_types: list[int], message: dict[str, A
     if event_type == 2 and 13 in sub_types:
         return True
     return "alarm_output" in message or "alarm_input" in message
+
+
+def channel_from_mapping(value: dict[str, Any]) -> int | None:
+    """Return a VIGI channel id from a mapping when present."""
+    for key in CHANNEL_KEYS:
+        channel = as_int(value.get(key))
+        if channel is not None:
+            return channel
+    return None
 
 
 def as_int(value: Any) -> int | None:
