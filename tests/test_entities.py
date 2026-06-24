@@ -308,7 +308,7 @@ def test_live_camera_entities_expose_rtsp_stream_sources() -> None:
 
     assert main_stream.available is True
     assert asyncio.run(main_stream.stream_source()) == (
-        "rtsp://nvr.local/live/1/1/avm"
+        "rtsp://user:p%40ss@nvr.local/live/1/1/avm"
     )
     assert main_stream.extra_state_attributes == {
         "channel": 1,
@@ -316,7 +316,7 @@ def test_live_camera_entities_expose_rtsp_stream_sources() -> None:
         "rtsp_url": "rtsp://nvr.local/live/1/1/avm",
     }
     assert asyncio.run(minor_stream.stream_source()) == (
-        "rtsp://nvr.local/live/1/2/avm"
+        "rtsp://user:p%40ss@nvr.local/live/1/2/avm"
     )
 
     assert missing_channel.available is False
