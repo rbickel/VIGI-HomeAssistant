@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 import sys
 import types
 from typing import Any
@@ -19,6 +20,25 @@ class TurboJPEG:
 
 turbojpeg_module.TurboJPEG = TurboJPEG
 sys.modules.setdefault("turbojpeg", turbojpeg_module)
+
+
+def _shim_optional_numpy() -> None:
+    """Let camera tests import Home Assistant stream without numpy installed."""
+    if "numpy" in sys.modules or importlib.util.find_spec("numpy") is not None:
+        return
+
+    def _unavailable_numpy(*args: object, **kwargs: object) -> object:
+        raise ModuleNotFoundError("numpy is not available in unit tests")
+
+    numpy_module = types.ModuleType("numpy")
+    numpy_module.ndarray = object
+    numpy_module.fliplr = _unavailable_numpy
+    numpy_module.flipud = _unavailable_numpy
+    numpy_module.rot90 = _unavailable_numpy
+    sys.modules["numpy"] = numpy_module
+
+
+_shim_optional_numpy()
 
 from custom_components.vigi_nvr.coordinator import (  # noqa: E402
     VigiNvrCoordinator,
