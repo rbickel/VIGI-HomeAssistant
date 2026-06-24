@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.camera import Camera
+from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -29,10 +29,68 @@ async def async_setup_entry(
         channel = as_int(device.get("id"))
         if channel is None:
             continue
+        entities.extend(
+            [
+                VigiChannelLiveCamera(coordinator, entry.entry_id, channel, 1),
+                VigiChannelLiveCamera(coordinator, entry.entry_id, channel, 2),
+            ]
+        )
         entities.append(
             VigiChannelLastEventImageCamera(coordinator, entry.entry_id, channel)
         )
     async_add_entities(entities)
+
+
+class VigiChannelLiveCamera(VigiChannelEntity, Camera):
+    """Camera exposing a documented VIGI RTSP live stream."""
+
+    _attr_supported_features = CameraEntityFeature.STREAM
+
+    def __init__(
+        self,
+        coordinator: VigiNvrCoordinator,
+        entry_id: str,
+        channel: int,
+        stream: int,
+    ) -> None:
+        """Initialize a channel live stream camera."""
+        VigiChannelEntity.__init__(
+            self,
+            coordinator,
+            entry_id,
+            channel,
+            f"live_stream_{stream}",
+        )
+        Camera.__init__(self)
+        self._stream = stream
+        self._attr_name = f"Live stream {stream}"
+
+    @property
+    def available(self) -> bool:
+        """Return whether the live stream source can be generated."""
+        return self.coordinator.last_update_success and bool(self.channel_data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return live stream metadata."""
+        return {
+            "channel": self.channel,
+            "stream": self._stream,
+            "rtsp_url": self.coordinator.client.live_stream_url(
+                self.channel,
+                self._stream,
+            ),
+        }
+
+    async def stream_source(self) -> str | None:
+        """Return the RTSP source URL for Home Assistant stream handling."""
+        if not self.available:
+            return None
+        return self.coordinator.client.live_stream_url(
+            self.channel,
+            self._stream,
+            include_credentials=True,
+        )
 
 
 class VigiEventImageCameraMixin:
