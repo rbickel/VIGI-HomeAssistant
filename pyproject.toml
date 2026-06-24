@@ -2,7 +2,7 @@
 name = "vigi-nvr-home-assistant"
 version = "0.1.0"
 description = "Home Assistant custom integration scaffold for TP-Link VIGI NVR OpenAPI."
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = []
 
 [project.optional-dependencies]
@@ -14,7 +14,7 @@ dev = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
