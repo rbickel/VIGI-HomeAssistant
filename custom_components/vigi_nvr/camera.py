@@ -86,7 +86,11 @@ class VigiChannelLiveCamera(VigiChannelEntity, Camera):
         """Return the RTSP source URL for Home Assistant stream handling."""
         if not self.available:
             return None
-        return self.coordinator.client.live_stream_url(self.channel, self._stream)
+        return self.coordinator.client.live_stream_url(
+            self.channel,
+            self._stream,
+            include_credentials=True,
+        )
 
 
 class VigiEventImageCameraMixin:

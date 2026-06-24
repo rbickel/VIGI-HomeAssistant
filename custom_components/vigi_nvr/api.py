@@ -486,9 +486,20 @@ class VigiNvrClient:
             json_body={"action": action},
         )
 
-    def live_stream_url(self, channel: int, stream: int = 1) -> str:
+    def live_stream_url(
+        self,
+        channel: int,
+        stream: int = 1,
+        *,
+        include_credentials: bool = False,
+    ) -> str:
         """Return the documented RTSP live stream URL for a channel."""
-        return f"rtsp://{self.host}/live/{channel}/{stream}/avm"
+        authority = self.host
+        if include_credentials:
+            username = urllib.parse.quote(self.username, safe="")
+            password = urllib.parse.quote(self.password, safe="")
+            authority = f"{username}:{password}@{self.host}"
+        return f"rtsp://{authority}/live/{channel}/{stream}/avm"
 
     def replay_stream_url(
         self,

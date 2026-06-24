@@ -117,8 +117,16 @@ class RecordingClient:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...]]] = []
 
-    def live_stream_url(self, channel: int, stream: int = 1) -> str:
+    def live_stream_url(
+        self,
+        channel: int,
+        stream: int = 1,
+        *,
+        include_credentials: bool = False,
+    ) -> str:
         """Return a deterministic RTSP URL for sensor tests."""
+        if include_credentials:
+            return f"rtsp://user:p%40ss@nvr.local/live/{channel}/{stream}/avm"
         return f"rtsp://nvr.local/live/{channel}/{stream}/avm"
 
     async def async_set_audio_output_sound(
