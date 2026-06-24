@@ -53,9 +53,7 @@ class VigiNvrClient:
     @property
     def ssl_context(self) -> ssl.SSLContext | bool:
         """Return the TLS verification mode for aiohttp."""
-        if self.verify_tls:
-            return True
-        return False
+        return bool(self.verify_tls)
 
     async def authenticate(self) -> str:
         """Authenticate with Digest auth and cache the bearer token."""
@@ -558,8 +556,7 @@ def build_digest_authorization_variants(
     )
     return [
         "Digest " + ", ".join(fields),
-        "Digest "
-        + ", ".join((*fields, f'uri="{uri}"', 'algorithm="SHA-256"')),
+        "Digest " + ", ".join((*fields, f'uri="{uri}"', 'algorithm="SHA-256"')),
     ]
 
 

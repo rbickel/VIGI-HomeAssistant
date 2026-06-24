@@ -1,0 +1,346 @@
+name: CI and Release
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run Ruff lint
+        run: python -m ruff check .
+
+      - name: Run test suite
+        run: python -m pytest
+
+  publish-preview:
+    name: Publish PR prerelease
+    needs: validate
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out tested PR merge
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute preview version
+        id: version
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          latest_tag="$({ git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname || true; } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+
+          if [[ -n "${latest_tag}" ]]; then
+            base_version="${latest_tag#v}"
+          else
+            base_version="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as pyproject:
+              print(tomllib.load(pyproject)["project"]["version"])
+          PY
+          )"
+            base_version="${base_version#v}"
+          fi
+
+          IFS=. read -r major minor patch <<< "${base_version}"
+          patch=$((patch + 1))
+          version="${major}.${minor}.${patch}rc${PR_NUMBER}.dev${GITHUB_RUN_NUMBER}"
+          tag="v${version}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists." >&2
+            exit 1
+          fi
+
+          {
+            echo "base_tag=${latest_tag}"
+            echo "version=${version}"
+            echo "tag=${tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update version metadata
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          pyproject_path = Path("pyproject.toml")
+          pyproject_text = pyproject_path.read_text(encoding="utf-8")
+          pyproject_text = re.sub(
+              r'(?m)^(version\s*=\s*)"[^"]+"',
+              rf'\g<1>"{version}"',
+              pyproject_text,
+              count=1,
+          )
+          pyproject_path.write_text(pyproject_text, encoding="utf-8")
+
+          manifest_path = Path("custom_components/vigi_nvr/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = version
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Generate friendly release notes
+        env:
+          BASE_TAG: ${{ steps.version.outputs.base_tag }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python scripts/generate_release_notes.py \
+            --kind preview \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --base-tag "${BASE_TAG}" \
+            --pr-number "${PR_NUMBER}" \
+            --head-ref "${PR_HEAD_REF}" \
+            --base-ref "${PR_BASE_REF}" \
+            --output release-notes.md
+
+      - name: Commit and tag preview metadata
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git add pyproject.toml custom_components/vigi_nvr/manifest.json
+          git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
+          git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
+
+      - name: Push preview tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${RELEASE_TAG} already exists on origin." >&2
+            exit 1
+          fi
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+      - name: Create GitHub prerelease
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${RELEASE_TAG}" \
+            --title "🧪 Preview ${RELEASE_TAG} for PR #${PR_NUMBER}" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --verify-tag
+
+  publish-release:
+    name: Publish stable release
+    needs: validate
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, 'chore(release):')
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute stable version
+        id: version
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          head_tag="$({ git tag --points-at HEAD || true; } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          if [[ -n "${head_tag}" ]]; then
+            echo "HEAD is already tagged as ${head_tag}; skipping release."
+            echo "should_release=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          latest_tag="$({ git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname || true; } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          if [[ -n "${latest_tag}" ]]; then
+            base_version="${latest_tag#v}"
+          else
+            base_version="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as pyproject:
+              print(tomllib.load(pyproject)["project"]["version"])
+          PY
+          )"
+            base_version="${base_version#v}"
+          fi
+
+          IFS=. read -r major minor _patch <<< "${base_version}"
+          minor=$((minor + 1))
+          version="${major}.${minor}.0"
+          tag="v${version}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists." >&2
+            exit 1
+          fi
+
+          {
+            echo "base_tag=${latest_tag}"
+            echo "should_release=true"
+            echo "version=${version}"
+            echo "tag=${tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update version metadata
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          pyproject_path = Path("pyproject.toml")
+          pyproject_text = pyproject_path.read_text(encoding="utf-8")
+          pyproject_text = re.sub(
+              r'(?m)^(version\s*=\s*)"[^"]+"',
+              rf'\g<1>"{version}"',
+              pyproject_text,
+              count=1,
+          )
+          pyproject_path.write_text(pyproject_text, encoding="utf-8")
+
+          manifest_path = Path("custom_components/vigi_nvr/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = version
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Generate friendly release notes
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          BASE_TAG: ${{ steps.version.outputs.base_tag }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python scripts/generate_release_notes.py \
+            --kind stable \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --base-tag "${BASE_TAG}" \
+            --output release-notes.md
+
+      - name: Commit release metadata
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git add pyproject.toml custom_components/vigi_nvr/manifest.json
+          if git diff --cached --quiet; then
+            echo "No version metadata changes were produced." >&2
+            exit 1
+          fi
+          git commit -m "chore(release): ${RELEASE_TAG} [skip ci]"
+          git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
+
+      - name: Push release commit and tag
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${RELEASE_TAG} already exists on origin." >&2
+            exit 1
+          fi
+          git push origin HEAD:main
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+      - name: Create GitHub release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${RELEASE_TAG}" \
+            --title "🚀 ${RELEASE_TAG}" \
+            --notes-file release-notes.md \
+            --verify-tag

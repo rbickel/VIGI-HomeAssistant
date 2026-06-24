@@ -10,6 +10,8 @@ from custom_components.vigi_nvr.binary_sensor import (
     VigiChannelOnlineBinarySensor,
     VigiLastEventAlarmRelatedBinarySensor,
     VigiPoePortLinkedBinarySensor,
+)
+from custom_components.vigi_nvr.binary_sensor import (
     poe_ports as binary_sensor_poe_ports,
 )
 from custom_components.vigi_nvr.camera import (
@@ -115,13 +117,16 @@ def test_sensors_calculate_static_power_event_and_url_values() -> None:
     coordinator.last_event_received_at = dt.datetime(2026, 6, 24, 12, tzinfo=dt.UTC)
     coordinator.last_event_client_ip = "192.0.2.30"
 
-    assert VigiNvrCountSensor(
-        coordinator,
-        "entry-1",
-        "channels",
-        "Channels",
-        "devices",
-    ).native_value == 2
+    assert (
+        VigiNvrCountSensor(
+            coordinator,
+            "entry-1",
+            "channels",
+            "Channels",
+            "devices",
+        ).native_value
+        == 2
+    )
     assert VigiNvrTimingModeSensor(coordinator, "entry-1").native_value == "ntp"
     assert VigiNvrNtpServerSensor(coordinator, "entry-1").native_value == "pool.ntp.org"
     assert VigiNvrNtpServerSensor(coordinator, "entry-1").extra_state_attributes == {
@@ -133,40 +138,52 @@ def test_sensors_calculate_static_power_event_and_url_values() -> None:
     }
     assert VigiNvrPoeTotalPowerSensor(coordinator, "entry-1").native_value == 12.3
     assert VigiNvrPoeCostPowerSensor(coordinator, "entry-1").native_value == 4.5
-    assert VigiDiskSensor(
-        coordinator,
-        "entry-1",
-        2,
-        "status",
-        "Status",
-        lambda value: value.get("status"),
-    ).native_value == "missing"
-    assert VigiChannelStaticSensor(
-        coordinator,
-        "entry-1",
-        1,
-        "ip",
-        "IP address",
-        lambda value: value.get("ip"),
-    ).native_value == "192.0.2.20"
-    assert VigiChannelStreamSensor(
-        coordinator,
-        "entry-1",
-        1,
-        "main",
-        "resolution",
-        "Main resolution",
-        lambda value: value.get("resolution"),
-    ).native_value == "2560x1440"
-    assert VigiChannelStreamSensor(
-        coordinator,
-        "entry-1",
-        1,
-        "minor",
-        "bitrate",
-        "Minor bitrate",
-        lambda value: value.get("maximun_bitrate"),
-    ).native_value == "1024"
+    assert (
+        VigiDiskSensor(
+            coordinator,
+            "entry-1",
+            2,
+            "status",
+            "Status",
+            lambda value: value.get("status"),
+        ).native_value
+        == "missing"
+    )
+    assert (
+        VigiChannelStaticSensor(
+            coordinator,
+            "entry-1",
+            1,
+            "ip",
+            "IP address",
+            lambda value: value.get("ip"),
+        ).native_value
+        == "192.0.2.20"
+    )
+    assert (
+        VigiChannelStreamSensor(
+            coordinator,
+            "entry-1",
+            1,
+            "main",
+            "resolution",
+            "Main resolution",
+            lambda value: value.get("resolution"),
+        ).native_value
+        == "2560x1440"
+    )
+    assert (
+        VigiChannelStreamSensor(
+            coordinator,
+            "entry-1",
+            1,
+            "minor",
+            "bitrate",
+            "Minor bitrate",
+            lambda value: value.get("maximun_bitrate"),
+        ).native_value
+        == "1024"
+    )
     assert VigiChannelRtspSensor(coordinator, "entry-1", 1, 2).native_value == (
         "rtsp://nvr.local/live/1/2/avm"
     )

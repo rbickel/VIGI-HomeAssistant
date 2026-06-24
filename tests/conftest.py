@@ -20,7 +20,10 @@ class TurboJPEG:
 turbojpeg_module.TurboJPEG = TurboJPEG
 sys.modules.setdefault("turbojpeg", turbojpeg_module)
 
-from custom_components.vigi_nvr.coordinator import VigiNvrCoordinator, VigiNvrData
+from custom_components.vigi_nvr.coordinator import (  # noqa: E402
+    VigiNvrCoordinator,
+    VigiNvrData,
+)
 
 
 @dataclasses.dataclass

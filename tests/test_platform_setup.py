@@ -21,9 +21,7 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
     sensor_entities: list[object] = []
     switch_entities: list[object] = []
 
-    asyncio.run(
-        binary_sensor.async_setup_entry(hass, entry, binary_entities.extend)
-    )
+    asyncio.run(binary_sensor.async_setup_entry(hass, entry, binary_entities.extend))
     asyncio.run(camera.async_setup_entry(hass, entry, camera_entities.extend))
     asyncio.run(sensor.async_setup_entry(hass, entry, sensor_entities.extend))
     asyncio.run(switch.async_setup_entry(hass, entry, switch_entities.extend))
@@ -32,9 +30,7 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
     assert len(camera_entities) == 2
     assert len(sensor_entities) == 27
     assert len(switch_entities) == 4
-    assert {
-        getattr(entity, "_attr_unique_id", None) for entity in binary_entities
-    } == {
+    assert {getattr(entity, "_attr_unique_id", None) for entity in binary_entities} == {
         "entry-1_channel_1_online",
         "entry-1_poe_port_1_linked",
         "entry-1_poe_port_2_linked",
@@ -42,15 +38,11 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
         "entry-1_event_server_configured",
         "entry-1_last_event_alarm_related",
     }
-    assert {
-        getattr(entity, "_attr_unique_id", None) for entity in camera_entities
-    } == {
+    assert {getattr(entity, "_attr_unique_id", None) for entity in camera_entities} == {
         "entry-1_unassigned_event_image",
         "entry-1_channel_1_last_event_image",
     }
-    assert {
-        getattr(entity, "_attr_unique_id", None) for entity in switch_entities
-    } == {
+    assert {getattr(entity, "_attr_unique_id", None) for entity in switch_entities} == {
         "entry-1_channel_1_output_mute",
         "entry-1_channel_1_input_mute",
         "entry-1_channel_1_noise_cancelling",

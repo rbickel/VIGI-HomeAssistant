@@ -16,7 +16,9 @@ class VigiNvrEntity(CoordinatorEntity[VigiNvrCoordinator]):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: VigiNvrCoordinator, entry_id: str, key: str) -> None:
+    def __init__(
+        self, coordinator: VigiNvrCoordinator, entry_id: str, key: str
+    ) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_{key}"
         self._entry_id = entry_id
@@ -57,7 +59,11 @@ class VigiChannelEntity(VigiNvrEntity):
     def device_info(self) -> DeviceInfo:
         """Return channel device information."""
         channel = self.channel_data
-        name = channel.get("name") or channel.get("alias") or f"VIGI Channel {self.channel}"
+        name = (
+            channel.get("name")
+            or channel.get("alias")
+            or f"VIGI Channel {self.channel}"
+        )
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry_id}_channel_{self.channel}")},
             name=str(name),

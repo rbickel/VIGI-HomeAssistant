@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import urllib.parse
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -29,7 +29,9 @@ async def async_setup_entry(
     """Set up VIGI NVR sensors."""
     coordinator: VigiNvrCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[SensorEntity] = [
-        VigiNvrCountSensor(coordinator, entry.entry_id, "channels", "Channels", "devices"),
+        VigiNvrCountSensor(
+            coordinator, entry.entry_id, "channels", "Channels", "devices"
+        ),
         VigiNvrCountSensor(coordinator, entry.entry_id, "disks", "Disks", "disks"),
         VigiNvrCountSensor(
             coordinator,
@@ -359,7 +361,9 @@ class VigiDiskSensor(VigiNvrEntity, SensorEntity):
         value_fn: Callable[[dict[str, Any]], Any],
     ) -> None:
         super().__init__(coordinator, entry_id, f"disk_{disk_id}_{key}")
-        self.entity_description = SensorEntityDescription(key=key, name=f"Disk {disk_id} {name}")
+        self.entity_description = SensorEntityDescription(
+            key=key, name=f"Disk {disk_id} {name}"
+        )
         self._disk_id = disk_id
         self._value_fn = value_fn
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -371,7 +375,10 @@ class VigiDiskSensor(VigiNvrEntity, SensorEntity):
     @property
     def disk_data(self) -> dict[str, Any]:
         for disk in self.coordinator.data.disks:
-            if as_int(disk.get("id")) == self._disk_id or as_int(disk.get("slot")) == self._disk_id:
+            if (
+                as_int(disk.get("id")) == self._disk_id
+                or as_int(disk.get("slot")) == self._disk_id
+            ):
                 return disk
         return {}
 
@@ -442,7 +449,9 @@ class VigiChannelStreamSensor(VigiChannelEntity, SensorEntity):
         value_fn: Callable[[dict[str, Any]], Any],
     ) -> None:
         super().__init__(coordinator, entry_id, channel, f"{stream}_{key}")
-        self.entity_description = SensorEntityDescription(key=f"{stream}_{key}", name=name)
+        self.entity_description = SensorEntityDescription(
+            key=f"{stream}_{key}", name=name
+        )
         self._stream = stream
         self._value_fn = value_fn
         self._attr_entity_category = EntityCategory.DIAGNOSTIC

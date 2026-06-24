@@ -42,19 +42,21 @@ def test_parse_json_event_push_annotates_messages() -> None:
 def test_parse_multipart_event_push_extracts_event_and_image() -> None:
     """Multipart pushes keep JSON metadata and image attachments separately."""
     boundary = "----pytest-boundary"
-    event = json.dumps(
-        {"channel_id": "4", "messages": [{"type": 2, "sub_type": 13}]}
-    )
+    event = json.dumps({"channel_id": "4", "messages": [{"type": 2, "sub_type": 13}]})
     image_data = b"\xff\xd8fake-jpeg\xff\xd9"
     body = (
-        f"--{boundary}\r\n"
-        'Content-Disposition: form-data; name="event"\r\n'
-        "Content-Type: application/json\r\n\r\n"
-        f"{event}\r\n"
-        f"--{boundary}\r\n"
-        'Content-Disposition: form-data; name="picture"; filename="alarm.jpg"\r\n'
-        "Content-Type: image/jpeg\r\n\r\n"
-    ).encode() + image_data + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="event"\r\n'
+            "Content-Type: application/json\r\n\r\n"
+            f"{event}\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="picture"; filename="alarm.jpg"\r\n'
+            "Content-Type: image/jpeg\r\n\r\n"
+        ).encode()
+        + image_data
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     event_push = parse_vigi_event_push(
         f"multipart/form-data; boundary={boundary}",

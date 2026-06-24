@@ -218,9 +218,8 @@ def parse_multipart_event_push(
 ) -> tuple[list[dict[str, Any]], list[VigiEventImage]]:
     """Parse VIGI multipart event push payloads."""
     header_blob = (
-        f"Content-Type: {content_type}\r\n"
-        f"MIME-Version: 1.0\r\n\r\n"
-    ).encode("utf-8")
+        f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n"
+    ).encode()
     message = email.parser.BytesParser(policy=email.policy.default).parsebytes(
         header_blob + body
     )
@@ -301,7 +300,9 @@ def normalize_subtypes(value: Any) -> list[int]:
     return [sub_type] if sub_type is not None else []
 
 
-def is_alarm_related(event_type: int, sub_types: list[int], message: dict[str, Any]) -> bool:
+def is_alarm_related(
+    event_type: int, sub_types: list[int], message: dict[str, Any]
+) -> bool:
     """Return whether a VIGI message is alarm-related."""
     if event_type == 1 and 18 in sub_types:
         return True

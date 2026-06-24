@@ -63,8 +63,7 @@ class FakeSession:
 def test_parse_digest_challenge_accepts_quoted_and_bare_values() -> None:
     """Digest challenges are parsed into lower-case field names."""
     challenge = parse_digest_challenge(
-        'Digest realm="VIGI", nonce="abc123", algorithm=SHA-256, '
-        'url="/openapi/token"'
+        'Digest realm="VIGI", nonce="abc123", algorithm=SHA-256, url="/openapi/token"'
     )
 
     assert challenge == {
@@ -204,9 +203,10 @@ def test_request_reauthenticates_after_unauthorized_and_decodes_json() -> None:
     )
 
     assert result == {"error_code": 0, "value": "ok now"}
-    assert [
-        request["headers"]["Authorization"] for request in session.requests
-    ] == ["Bearer old-token", "Bearer new-token"]
+    assert [request["headers"]["Authorization"] for request in session.requests] == [
+        "Bearer old-token",
+        "Bearer new-token",
+    ]
     assert session.requests[0]["json"] == {"name": "Front%20Door"}
 
 

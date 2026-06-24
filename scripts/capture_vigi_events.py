@@ -128,13 +128,17 @@ class VigiEventCaptureHandler(http.server.BaseHTTPRequestHandler):
             }
             self._send_json(200, payload)
             return
-        self._send_json(404, {"error": "not_found", "event_path": self.server.config.path})
+        self._send_json(
+            404, {"error": "not_found", "event_path": self.server.config.path}
+        )
 
     def do_POST(self) -> None:
         """Capture an event POST body."""
         parsed_path = urllib.parse.urlparse(self.path).path
         if parsed_path != self.server.config.path:
-            self._send_json(404, {"error": "not_found", "event_path": self.server.config.path})
+            self._send_json(
+                404, {"error": "not_found", "event_path": self.server.config.path}
+            )
             return
 
         try:
@@ -177,9 +181,10 @@ class VigiEventCaptureHandler(http.server.BaseHTTPRequestHandler):
             length = int(content_length)
         except ValueError as error:
             raise ValueError("invalid Content-Length") from error
-        if length > self.server.config.max_body_bytes:
+        max_body_bytes = self.server.config.max_body_bytes
+        if length > max_body_bytes:
             raise ValueError(
-                f"body too large: {length} bytes exceeds {self.server.config.max_body_bytes}"
+                f"body too large: {length} bytes exceeds {max_body_bytes}"
             )
         return self.rfile.read(length)
 
@@ -228,12 +233,13 @@ def parse_event_request(
     return parsed
 
 
-def parse_multipart(content_type: str, body: bytes, capture_dir: Path) -> list[dict[str, Any]]:
+def parse_multipart(
+    content_type: str, body: bytes, capture_dir: Path
+) -> list[dict[str, Any]]:
     """Parse multipart/form-data without third-party dependencies."""
     header_blob = (
-        f"Content-Type: {content_type}\r\n"
-        f"MIME-Version: 1.0\r\n\r\n"
-    ).encode("utf-8")
+        f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n"
+    ).encode()
     message = email.parser.BytesParser(policy=email.policy.default).parsebytes(
         header_blob + body
     )
@@ -249,7 +255,9 @@ def parse_multipart(content_type: str, body: bytes, capture_dir: Path) -> list[d
         filename = part.get_filename()
         media_type = part.get_content_type()
         suffix = suffix_for_part(media_type, part_name, filename)
-        part_file = capture_dir / f"part-{index:02d}-{safe_name(part_name or 'body')}{suffix}"
+        part_file = (
+            capture_dir / f"part-{index:02d}-{safe_name(part_name or 'body')}{suffix}"
+        )
         part_file.write_bytes(part_body)
 
         summary: dict[str, Any] = {
@@ -324,7 +332,9 @@ def normalize_subtypes(value: Any) -> list[int]:
     return [sub_type] if sub_type is not None else []
 
 
-def is_alarm_related(event_type: int, sub_types: list[int], message: dict[str, Any]) -> bool:
+def is_alarm_related(
+    event_type: int, sub_types: list[int], message: dict[str, Any]
+) -> bool:
     """Return whether the event message looks alarm-related."""
     if event_type == 1 and 18 in sub_types:
         return True
@@ -430,8 +440,12 @@ def local_ip_hint() -> str | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bind", default=os.environ.get("VIGI_EVENT_BIND", "0.0.0.0"))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("VIGI_EVENT_PORT", "3001")))
-    parser.add_argument("--path", default=os.environ.get("VIGI_EVENT_PATH", DEFAULT_PATH))
+    parser.add_argument(
+        "--port", type=int, default=int(os.environ.get("VIGI_EVENT_PORT", "3001"))
+    )
+    parser.add_argument(
+        "--path", default=os.environ.get("VIGI_EVENT_PATH", DEFAULT_PATH)
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,

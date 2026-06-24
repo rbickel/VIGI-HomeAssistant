@@ -106,7 +106,9 @@ class VigiChannelLastEventImageCamera(
         channel: int,
     ) -> None:
         """Initialize a channel latest event image camera."""
-        VigiChannelEntity.__init__(self, coordinator, entry_id, channel, "last_event_image")
+        VigiChannelEntity.__init__(
+            self, coordinator, entry_id, channel, "last_event_image"
+        )
         Camera.__init__(self)
 
     @property

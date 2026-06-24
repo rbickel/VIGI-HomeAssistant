@@ -32,12 +32,18 @@ async def async_setup_entry(
         channel = as_int(device.get("id"))
         if channel is None:
             continue
-        entities.append(VigiChannelOnlineBinarySensor(coordinator, entry.entry_id, channel))
+        entities.append(
+            VigiChannelOnlineBinarySensor(coordinator, entry.entry_id, channel)
+        )
 
     for port in poe_ports(coordinator.data):
-        entities.append(VigiPoePortLinkedBinarySensor(coordinator, entry.entry_id, port))
+        entities.append(
+            VigiPoePortLinkedBinarySensor(coordinator, entry.entry_id, port)
+        )
 
-    entities.append(VigiAlarmEventServerConfiguredBinarySensor(coordinator, entry.entry_id))
+    entities.append(
+        VigiAlarmEventServerConfiguredBinarySensor(coordinator, entry.entry_id)
+    )
     entities.append(VigiLastEventAlarmRelatedBinarySensor(coordinator, entry.entry_id))
     async_add_entities(entities)
 
