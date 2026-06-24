@@ -6,9 +6,13 @@ import asyncio
 import datetime as dt
 
 from custom_components.vigi_nvr.binary_sensor import (
+    CHANNEL_EVENT_BINARY_SENSOR_DESCRIPTIONS,
+    NVR_EVENT_BINARY_SENSOR_DESCRIPTIONS,
     VigiAlarmEventServerConfiguredBinarySensor,
+    VigiChannelEventBinarySensor,
     VigiChannelOnlineBinarySensor,
     VigiLastEventAlarmRelatedBinarySensor,
+    VigiNvrEventBinarySensor,
     VigiPoePortLinkedBinarySensor,
 )
 from custom_components.vigi_nvr.binary_sensor import (
@@ -97,6 +101,114 @@ def test_binary_sensors_calculate_values_and_attributes() -> None:
         "source_ip": "192.0.2.25",
         "last_message": {"alarm_related": True, "type_label": "Alarm"},
     }
+
+
+def test_event_binary_sensors_expose_latched_event_metadata() -> None:
+    """Event binary sensors latch matching pushes with useful attributes."""
+    coordinator = make_coordinator(data=populated_data())
+    event_push = VigiEventPush(
+        mode="json",
+        event={
+            "messages": [
+                {
+                    "channel": "1",
+                    "type": 1,
+                    "sub_type": [2, 21],
+                    "type_label": "Channel event",
+                    "sub_type_labels": ["Motion detection", "Human detection"],
+                },
+                {
+                    "type": 2,
+                    "sub_type": 7,
+                    "disk": "2",
+                    "type_label": "Device exception",
+                    "sub_type_labels": ["Disk error"],
+                },
+            ]
+        },
+        events=[
+            {
+                "messages": [
+                    {
+                        "channel": "1",
+                        "type": 1,
+                        "sub_type": [2, 21],
+                        "type_label": "Channel event",
+                        "sub_type_labels": [
+                            "Motion detection",
+                            "Human detection",
+                        ],
+                    },
+                    {
+                        "type": 2,
+                        "sub_type": 7,
+                        "disk": "2",
+                        "type_label": "Device exception",
+                        "sub_type_labels": ["Disk error"],
+                    },
+                ]
+            }
+        ],
+        images=[],
+        raw_bytes=20,
+        content_type="application/json",
+    )
+    coordinator.store_event_push(event_push, "192.0.2.60")
+
+    motion_description = next(
+        description
+        for description in CHANNEL_EVENT_BINARY_SENSOR_DESCRIPTIONS
+        if description.key == "event_motion_detection"
+    )
+    vehicle_description = next(
+        description
+        for description in CHANNEL_EVENT_BINARY_SENSOR_DESCRIPTIONS
+        if description.key == "event_vehicle_detection"
+    )
+    disk_error_description = next(
+        description
+        for description in NVR_EVENT_BINARY_SENSOR_DESCRIPTIONS
+        if description.key == "event_disk_error"
+    )
+
+    motion_sensor = VigiChannelEventBinarySensor(
+        coordinator,
+        "entry-1",
+        1,
+        motion_description,
+    )
+    vehicle_sensor = VigiChannelEventBinarySensor(
+        coordinator,
+        "entry-1",
+        1,
+        vehicle_description,
+    )
+    disk_error_sensor = VigiNvrEventBinarySensor(
+        coordinator,
+        "entry-1",
+        disk_error_description,
+    )
+
+    assert motion_sensor.is_on is True
+    assert motion_sensor.extra_state_attributes["source_ip"] == "192.0.2.60"
+    assert motion_sensor.extra_state_attributes["type_label"] == "Channel event"
+    assert motion_sensor.extra_state_attributes["sub_type"] == 2
+    assert motion_sensor.extra_state_attributes["channel"] == 1
+    assert motion_sensor.extra_state_attributes["message"] == {
+        "channel": "1",
+        "type": 1,
+        "sub_type": [2, 21],
+        "type_label": "Channel event",
+        "sub_type_labels": ["Motion detection", "Human detection"],
+    }
+    assert vehicle_sensor.is_on is None
+    assert vehicle_sensor.extra_state_attributes["message"] is None
+
+    assert disk_error_sensor.is_on is True
+    assert disk_error_sensor.extra_state_attributes["disk"] == 2
+    assert disk_error_sensor.extra_state_attributes["sub_type_labels"] == [
+        "Disk error"
+    ]
 
 
 def test_sensors_calculate_static_power_event_and_url_values() -> None:

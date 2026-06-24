@@ -14,6 +14,7 @@ This integration is currently early-stage and focused on local NVR control/monit
 - Parsed `vigi_nvr_event` events on the Home Assistant event bus.
 - Per-channel live camera entities backed by credentialed VIGI RTSP stream URLs.
 - Per-channel latest event image cameras for picture attachments sent with VIGI push events.
+- Latched event binary sensors for common channel events and NVR exception events.
 - Alarm-related push detection for documented VIGI alarm signal/input events.
 
 ## Requirements
@@ -135,6 +136,16 @@ Binary sensors include:
 - PoE port linked state.
 - Event server configured state.
 - Latest event alarm-related state.
+- Per-channel latched event states for motion detection, human detection, vehicle
+  detection, camera tampering, line crossing, intrusion, video loss, and alarm
+  signal.
+- NVR-level latched exception states for disk errors, device offline, alarm input,
+  fan abnormal, PoE faults, RAID state, and storage-full events.
+
+Event binary sensors start as unknown, then turn on after the matching VIGI push
+is received. Attributes include the receive timestamp, source IP, VIGI
+type/subtype labels, channel or disk metadata when present, and the parsed
+message payload without raw image bytes.
 
 Switches include:
 
