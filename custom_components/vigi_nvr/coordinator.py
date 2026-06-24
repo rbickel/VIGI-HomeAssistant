@@ -13,7 +13,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import VigiApiError, VigiNvrClient
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN, STREAM_MAIN, STREAM_MINOR
-from .events import VigiEventImage, VigiEventPush
+from .events import (
+    EVENT_SUBTYPE_LABELS,
+    EVENT_TYPE_LABELS,
+    VigiEventImage,
+    VigiEventPush,
+    channel_from_mapping,
+    normalize_subtypes,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +49,49 @@ class VigiNvrData:
     )
 
 
+@dataclasses.dataclass(slots=True)
+class VigiEventState:
+    """Latched VIGI event state for Home Assistant entities."""
+
+    event_type: int
+    sub_type: int
+    message: dict[str, Any]
+    event: dict[str, Any]
+    event_push: VigiEventPush
+    received_at: dt.datetime
+    client_ip: str | None
+    channel: int | None
+    disk: int | str | None
+
+    def as_attributes(self) -> dict[str, Any]:
+        """Return entity attributes for this event without raw image bytes."""
+        sub_type_labels = self.message.get("sub_type_labels")
+        if not isinstance(sub_type_labels, list):
+            sub_type_labels = [
+                EVENT_SUBTYPE_LABELS.get(self.event_type, {}).get(
+                    self.sub_type,
+                    "Unknown",
+                )
+            ]
+
+        return {
+            "received_at": self.received_at.isoformat(),
+            "source_ip": self.client_ip,
+            "type": self.event_type,
+            "sub_type": self.sub_type,
+            "type_label": self.message.get("type_label")
+            or EVENT_TYPE_LABELS.get(self.event_type, "Unknown"),
+            "sub_type_labels": sub_type_labels,
+            "channel": self.channel,
+            "disk": self.disk,
+            "event_mode": self.event_push.mode,
+            "message_count": self.event_push.message_count,
+            "raw_bytes": self.event_push.raw_bytes,
+            "content_type": self.event_push.content_type,
+            "message": self.message,
+        }
+
+
 class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
     """Coordinate polling for VIGI NVR state."""
 
@@ -67,6 +117,8 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.last_unassigned_event_client_ip: str | None = None
         self.last_event_received_at: dt.datetime | None = None
         self.last_event_client_ip: str | None = None
+        self.channel_event_states: dict[tuple[int, int, int], VigiEventState] = {}
+        self.nvr_event_states: dict[tuple[int, int], VigiEventState] = {}
 
     def set_event_webhook(self, webhook_id: str, webhook_url: str) -> None:
         """Store the Home Assistant webhook information for entities."""
@@ -86,8 +138,26 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.last_event_client_ip = client_ip
         if event_push.images:
             self._store_event_image(event_push, received_at, client_ip)
+        self._store_event_states(event_push, received_at, client_ip)
         self.async_set_updated_data(self.data)
         return received_at
+
+    def channel_event_state(
+        self,
+        channel: int,
+        event_type: int,
+        sub_type: int,
+    ) -> VigiEventState | None:
+        """Return the latest matching event state for a channel."""
+        return self.channel_event_states.get((channel, event_type, sub_type))
+
+    def nvr_event_state(
+        self,
+        event_type: int,
+        sub_type: int,
+    ) -> VigiEventState | None:
+        """Return the latest matching event state for the NVR device."""
+        return self.nvr_event_states.get((event_type, sub_type))
 
     def _store_event_image(
         self,
@@ -109,6 +179,46 @@ class VigiNvrCoordinator(DataUpdateCoordinator[VigiNvrData]):
         self.last_unassigned_event_push = event_push
         self.last_unassigned_event_received_at = received_at
         self.last_unassigned_event_client_ip = client_ip
+
+    def _store_event_states(
+        self,
+        event_push: VigiEventPush,
+        received_at: dt.datetime,
+        client_ip: str | None,
+    ) -> None:
+        """Store latched event state by type/subtype and channel when available."""
+        for event in event_push.events:
+            messages = event.get("messages", [])
+            if not isinstance(messages, list):
+                continue
+            for message in messages:
+                if not isinstance(message, dict):
+                    continue
+                event_type = as_int(message.get("type"))
+                if event_type is None:
+                    continue
+                for sub_type in normalize_subtypes(message.get("sub_type")):
+                    state = VigiEventState(
+                        event_type=event_type,
+                        sub_type=sub_type,
+                        message=message,
+                        event=event,
+                        event_push=event_push,
+                        received_at=received_at,
+                        client_ip=client_ip,
+                        channel=event_channel(event, message),
+                        disk=event_disk(event, message),
+                    )
+                    if (
+                        event_type == 1
+                        and state.channel is not None
+                        and self.has_channel(state.channel)
+                    ):
+                        self.channel_event_states[
+                            (state.channel, event_type, sub_type)
+                        ] = state
+                    else:
+                        self.nvr_event_states[(event_type, sub_type)] = state
 
     def has_channel(self, channel: int) -> bool:
         """Return whether the latest coordinator data contains a channel."""
@@ -202,3 +312,23 @@ def as_int(value: Any) -> int | None:
     if isinstance(value, str) and value.isdigit():
         return int(value)
     return None
+
+
+def event_channel(event: dict[str, Any], message: dict[str, Any]) -> int | None:
+    """Return the channel for a VIGI event message when present."""
+    channel = channel_from_mapping(message)
+    if channel is not None:
+        return channel
+    return channel_from_mapping(event)
+
+
+def event_disk(
+    event: dict[str, Any],
+    message: dict[str, Any],
+) -> int | str | None:
+    """Return disk metadata for a VIGI event message when present."""
+    value = message.get("disk")
+    if value is None:
+        value = event.get("disk")
+    disk = as_int(value)
+    return disk if disk is not None else value
