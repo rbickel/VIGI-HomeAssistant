@@ -162,6 +162,8 @@ def make_coordinator(
     coordinator.last_unassigned_event_client_ip = None
     coordinator.last_event_received_at = None
     coordinator.last_event_client_ip = None
+    coordinator.channel_event_states = {}
+    coordinator.nvr_event_states = {}
     coordinator.refresh_count = 0
     coordinator.updated_data = None
 
