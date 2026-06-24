@@ -11,6 +11,7 @@
 7. Updated discovery tooling to probe documented read-only endpoints and record mutating endpoints without calling them.
 8. Added a standalone HTTP event capture server for VIGI push messages.
 9. Added a Home Assistant webhook receiver for VIGI `event_message` pushes, plus last-event sensors and `vigi_nvr_event` bus events.
+10. Added live camera entities for documented VIGI RTSP stream 1 and stream 2 URLs.
 
 ## Next Validation Steps
 

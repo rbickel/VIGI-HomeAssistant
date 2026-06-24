@@ -27,7 +27,7 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
     asyncio.run(switch.async_setup_entry(hass, entry, switch_entities.extend))
 
     assert len(binary_entities) == 6
-    assert len(camera_entities) == 2
+    assert len(camera_entities) == 4
     assert len(sensor_entities) == 27
     assert len(switch_entities) == 4
     assert {getattr(entity, "_attr_unique_id", None) for entity in binary_entities} == {
@@ -40,6 +40,8 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
     }
     assert {getattr(entity, "_attr_unique_id", None) for entity in camera_entities} == {
         "entry-1_unassigned_event_image",
+        "entry-1_channel_1_live_stream_1",
+        "entry-1_channel_1_live_stream_2",
         "entry-1_channel_1_last_event_image",
     }
     assert {getattr(entity, "_attr_unique_id", None) for entity in switch_entities} == {

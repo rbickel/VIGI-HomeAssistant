@@ -12,6 +12,7 @@ This integration is currently early-stage and focused on local NVR control/monit
 - Switches for supported audio mute/noise cancelling and PoE port enable controls.
 - Home Assistant webhook receiver for VIGI event pushes.
 - Parsed `vigi_nvr_event` events on the Home Assistant event bus.
+- Per-channel live camera entities backed by documented VIGI RTSP stream URLs.
 - Per-channel latest event image cameras for picture attachments sent with VIGI push events.
 - Alarm-related push detection for documented VIGI alarm signal/input events.
 
@@ -144,6 +145,7 @@ Switches include:
 
 Cameras include:
 
+- Live VIGI stream 1 and stream 2 cameras for each camera channel.
 - Latest VIGI event image for each camera channel.
 - Unassigned event image fallback for picture attachments without a known channel.
 
@@ -171,7 +173,6 @@ If push events do not arrive:
 
 ## Current Limitations
 
-- Live camera entities are not implemented yet; RTSP URLs are exposed as diagnostic sensors.
 - Latest event images are kept in memory only and are replaced by the next pushed image for the same channel.
 - Event server registration is manual in the NVR UI for now.
 - Alarm arm/disarm controls are not implemented because no documented endpoint has been validated.

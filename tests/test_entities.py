@@ -16,6 +16,7 @@ from custom_components.vigi_nvr.binary_sensor import (
 )
 from custom_components.vigi_nvr.camera import (
     VigiChannelLastEventImageCamera,
+    VigiChannelLiveCamera,
     VigiUnassignedLastEventImageCamera,
 )
 from custom_components.vigi_nvr.coordinator import VigiNvrData
@@ -296,3 +297,27 @@ def test_camera_entities_expose_latest_event_images() -> None:
     unassigned = VigiUnassignedLastEventImageCamera(coordinator, "entry-1")
     assert unassigned.available is False
     assert asyncio.run(unassigned.async_camera_image()) is None
+
+
+def test_live_camera_entities_expose_rtsp_stream_sources() -> None:
+    """Live camera entities expose documented RTSP sources for HA streams."""
+    coordinator = make_coordinator(data=populated_data())
+    main_stream = VigiChannelLiveCamera(coordinator, "entry-1", 1, 1)
+    minor_stream = VigiChannelLiveCamera(coordinator, "entry-1", 1, 2)
+    missing_channel = VigiChannelLiveCamera(coordinator, "entry-1", 99, 1)
+
+    assert main_stream.available is True
+    assert asyncio.run(main_stream.stream_source()) == (
+        "rtsp://nvr.local/live/1/1/avm"
+    )
+    assert main_stream.extra_state_attributes == {
+        "channel": 1,
+        "stream": 1,
+        "rtsp_url": "rtsp://nvr.local/live/1/1/avm",
+    }
+    assert asyncio.run(minor_stream.stream_source()) == (
+        "rtsp://nvr.local/live/1/2/avm"
+    )
+
+    assert missing_channel.available is False
+    assert asyncio.run(missing_channel.stream_source()) is None
