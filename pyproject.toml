@@ -1,6 +1,6 @@
 [project]
 name = "vigi-nvr-home-assistant"
-version = "0.1.0"
+version = "0.1.3rc1.dev5"
 description = "Home Assistant custom integration scaffold for TP-Link VIGI NVR OpenAPI."
 requires-python = ">=3.13"
 dependencies = []
