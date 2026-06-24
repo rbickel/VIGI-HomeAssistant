@@ -159,6 +159,22 @@ def test_as_list_filters_to_mapping_items() -> None:
     assert as_list([], "devices") == []
 
 
+def test_live_stream_url_can_include_encoded_credentials() -> None:
+    """RTSP helpers can embed credentials only when explicitly requested."""
+    client = VigiNvrClient(
+        session=object(),
+        host="nvr.local",
+        port=20443,
+        username="admin user",
+        password="p@ss/word",
+    )
+
+    assert client.live_stream_url(1, 2) == "rtsp://nvr.local/live/1/2/avm"
+    assert client.live_stream_url(1, 2, include_credentials=True) == (
+        "rtsp://admin%20user:p%40ss%2Fword@nvr.local/live/1/2/avm"
+    )
+
+
 def test_encode_and_decode_json_strings_are_recursive() -> None:
     """VIGI string percent encoding is applied recursively."""
     payload = {
