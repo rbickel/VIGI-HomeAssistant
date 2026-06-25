@@ -11,7 +11,8 @@
 7. Updated discovery tooling to probe documented read-only endpoints and record mutating endpoints without calling them.
 8. Added a standalone HTTP event capture server for VIGI push messages.
 9. Added a Home Assistant webhook receiver for VIGI `event_message` pushes, plus last-event sensors and `vigi_nvr_event` bus events.
-10. Added live camera entities for documented VIGI RTSP stream 1 and stream 2 URLs.
+10. Added latched event binary sensors for common channel events and NVR/device exception events.
+11. Added live camera entities for documented VIGI RTSP stream 1 and stream 2 URLs.
 
 ## Next Validation Steps
 
@@ -36,9 +37,9 @@
 
 Run the endpoint probe, inspect response schemas, and update the catalog with model/firmware support notes.
 
-### Event Receiver Agent
+### Event Receiver Follow-Up Agent
 
-Expand the implemented webhook receiver into richer event entities and per-channel binary sensors for motion, human/vehicle, alarm signal, alarm input, video loss, and disk/device exceptions.
+Validate rich event sensors against more real VIGI payloads, then decide whether event-specific sensors should remain latched indefinitely or gain an optional reset timeout.
 
 ### Home Assistant Quality Agent
 

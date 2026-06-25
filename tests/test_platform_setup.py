@@ -26,7 +26,16 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
     asyncio.run(sensor.async_setup_entry(hass, entry, sensor_entities.extend))
     asyncio.run(switch.async_setup_entry(hass, entry, switch_entities.extend))
 
-    assert len(binary_entities) == 6
+    expected_channel_event_ids = {
+        f"entry-1_channel_1_{description.key}"
+        for description in binary_sensor.CHANNEL_EVENT_BINARY_SENSOR_DESCRIPTIONS
+    }
+    expected_nvr_event_ids = {
+        f"entry-1_{description.key}"
+        for description in binary_sensor.NVR_EVENT_BINARY_SENSOR_DESCRIPTIONS
+    }
+
+    assert len(binary_entities) == 28
     assert len(camera_entities) == 4
     assert len(sensor_entities) == 27
     assert len(switch_entities) == 4
@@ -37,7 +46,7 @@ def test_platform_setup_creates_entities_for_valid_channels_and_resources() -> N
         "entry-1_poe_port_3_linked",
         "entry-1_event_server_configured",
         "entry-1_last_event_alarm_related",
-    }
+    } | expected_channel_event_ids | expected_nvr_event_ids
     assert {getattr(entity, "_attr_unique_id", None) for entity in camera_entities} == {
         "entry-1_unassigned_event_image",
         "entry-1_channel_1_live_stream_1",

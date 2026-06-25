@@ -173,6 +173,7 @@ def test_store_event_push_tracks_channel_and_unassigned_images() -> None:
     assert coordinator.last_event_pushes_by_channel[1] is channel_push
     assert coordinator.last_event_received_at_by_channel[1] == received_at
     assert coordinator.last_event_client_ip_by_channel[1] == "192.0.2.50"
+    assert coordinator.channel_event_state(1, 1, 2) is None
     assert coordinator.updated_data is coordinator.data
 
     unassigned_image = VigiEventImage(
@@ -197,6 +198,74 @@ def test_store_event_push_tracks_channel_and_unassigned_images() -> None:
     assert coordinator.last_unassigned_event_push is unassigned_push
     assert coordinator.last_unassigned_event_received_at == unassigned_received_at
     assert coordinator.last_unassigned_event_client_ip is None
+
+
+def test_store_event_push_tracks_latched_event_state() -> None:
+    """Event storage records latest matching states by subtype and channel."""
+    coordinator = make_coordinator(data=VigiNvrData(devices=[{"id": "1"}]))
+    event_push = VigiEventPush(
+        mode="json",
+        event={
+            "messages": [
+                {
+                    "channel": "1",
+                    "type": 1,
+                    "sub_type": [2, 21],
+                    "type_label": "Channel event",
+                    "sub_type_labels": ["Motion detection", "Human detection"],
+                },
+                {
+                    "type": 2,
+                    "sub_type": 7,
+                    "disk": "2",
+                    "type_label": "Device exception",
+                    "sub_type_labels": ["Disk error"],
+                },
+            ]
+        },
+        events=[
+            {
+                "messages": [
+                    {
+                        "channel": "1",
+                        "type": 1,
+                        "sub_type": [2, 21],
+                        "type_label": "Channel event",
+                        "sub_type_labels": [
+                            "Motion detection",
+                            "Human detection",
+                        ],
+                    },
+                    {
+                        "type": 2,
+                        "sub_type": 7,
+                        "disk": "2",
+                        "type_label": "Device exception",
+                        "sub_type_labels": ["Disk error"],
+                    },
+                ]
+            }
+        ],
+        images=[],
+        raw_bytes=20,
+        content_type="application/json",
+    )
+
+    received_at = coordinator.store_event_push(event_push, "192.0.2.55")
+
+    motion_state = coordinator.channel_event_state(1, 1, 2)
+    assert motion_state is not None
+    assert coordinator.channel_event_state(1, 1, 21) is not None
+    assert coordinator.channel_event_state(2, 1, 2) is None
+    assert motion_state.received_at == received_at
+    assert motion_state.client_ip == "192.0.2.55"
+    assert motion_state.as_attributes()["channel"] == 1
+    assert motion_state.as_attributes()["sub_type"] == 2
+
+    disk_error_state = coordinator.nvr_event_state(2, 7)
+    assert disk_error_state is not None
+    assert disk_error_state.disk == 2
+    assert disk_error_state.as_attributes()["message_count"] == 2
 
 
 def test_has_channel_accepts_integer_and_numeric_string_ids() -> None:
